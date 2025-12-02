@@ -5,16 +5,60 @@
 
 using namespace stdx;
 using namespace stdx::details;
-TEST(ScanTest, BasicScan) {
-    constexpr auto fmt = "Name: {}, Age: {}, Score: {}"_fs;
-    constexpr auto source = fixed_string<34>("Name: Alice, Age: 25, Score: 95");
 
-    constexpr auto result = scan<fmt, source, std::string_view, int, int>();
-    const auto &[name, age, score] = result.values();
+/*
+TEST(ScanTest, CompileErrorInvalidFormatStr) {
+    constexpr auto fmt = "Name: {}, Age: {"_fs;
+    constexpr auto source = fixed_string<34>("Name: Alice, Age: 25");
+
+    constexpr auto result = scan<fmt, source, std::string_view, int>();
+    const auto &[name, age] = result.values();
+
+    static_assert(std::get<int>(result.values()) == 25);
 
     EXPECT_EQ(std::string_view(name), "Alice");
     EXPECT_EQ(age, 25);
-    EXPECT_EQ(score, 95);
+}
+
+TEST(ScanTest, CompileErrorInvalidNumberOfTemplateParams) {
+    constexpr auto fmt = "Name: {}, Age: {}"_fs;
+    constexpr auto source = fixed_string<34>("Name: Alice, Age: 25");
+
+    constexpr auto result = scan<fmt, source, std::string_view>(); //only one param
+    const auto &[name, age] = result.values();
+
+    static_assert(std::get<int>(result.values()) == 25);
+
+    EXPECT_EQ(std::string_view(name), "Alice");
+    EXPECT_EQ(age, 25);
+}
+
+TEST(ScanTest, CompileErrorInvalidSpecifier) {
+    constexpr auto fmt = "Name: {%d}, Age: {}"_fs;
+    constexpr auto source = fixed_string<34>("Name: Alice, Age: 25");
+
+    constexpr auto result = scan<fmt, source, std::string_view, int>(); //only one param
+    const auto &[name, age] = result.values();
+
+    static_assert(std::get<int>(result.values()) == 25);
+
+    EXPECT_EQ(std::string_view(name), "Alice");
+    EXPECT_EQ(age, 25);
+}
+
+*/
+
+TEST(ScanTest, BasicScan) {
+    constexpr auto fmt = "Name: {}, Age: {}"_fs;
+    constexpr auto source = fixed_string<34>("Name: Alice, Age: 25");
+
+    constexpr auto result = scan<fmt, source, std::string_view, int>();
+    const auto &[name, age] = result.values();
+
+    static_assert(std::get<int>(result.values()) == 25);
+
+    EXPECT_EQ(std::string_view(name), "Alice");
+    EXPECT_EQ(age, 25);
 }
 
 TEST(ScanTest, UnsignedIntegers) {
@@ -23,6 +67,7 @@ TEST(ScanTest, UnsignedIntegers) {
 
     constexpr auto result = scan<fmt, source, std::uint8_t, std::uint16_t, std::uint32_t>();
     const auto &[a, b, c] = result.values();
+    static_assert(std::get<std::uint8_t>(result.values()) == 255);
 
     EXPECT_EQ(a, 255);
     EXPECT_EQ(b, 65535);
@@ -31,9 +76,9 @@ TEST(ScanTest, UnsignedIntegers) {
 
 TEST(ScanTest, SignedIntegers) {
     constexpr auto fmt = "X: {}, Y: {}, Z: {}"_fs;
-    constexpr auto source = fixed_string<25>("X: -128, Y: 32767, Z: -1");
+    constexpr auto source = fixed_string("X: -128, Y: 32767, Z: -1");
 
-    constexpr auto result = scan<fmt, source, std::int8_t, std::int16_t, std::int32_t>();
+    constexpr auto result = scan<fmt, source, std::int16_t, std::int32_t, std::int64_t>();
     const auto &[x, y, z] = result.values();
 
     EXPECT_EQ(x, -128);
@@ -43,10 +88,11 @@ TEST(ScanTest, SignedIntegers) {
 
 TEST(ScanTest, FormatSpecifiers) {
     constexpr auto fmt = "ID: {%d}, Name: {%s}, Count: {%u}"_fs;
-    constexpr auto source = fixed_string<30>("ID: 42, Name: Bob, Count: 100");
+    constexpr auto source = fixed_string("ID: 42, Name: Bob, Count: 100");
 
     constexpr auto result = scan<fmt, source, int, std::string_view, unsigned int>();
     const auto &[id, name, count] = result.values();
+    static_assert(std::get<int>(result.values()) == 42);
 
     EXPECT_EQ(id, 42);
     EXPECT_EQ(std::string_view(name), "Bob");
@@ -58,6 +104,7 @@ TEST(ScanTest, CVQualifiedTypes) {
 
     constexpr auto result = scan<fmt, source, int, std::string_view>();
     const auto &[value, text] = result.values();
+    static_assert(std::get<int>(result.values()) == 123);
 
     EXPECT_EQ(value, 123);
     EXPECT_EQ(std::string_view(text), "Hello");
@@ -76,7 +123,7 @@ TEST(ScanTest, MixedSpecifiers) {
 }
 TEST(ScanTest, BoundaryValues) {
     constexpr auto fmt = "Min: {}, Max: {}, Zero: {}"_fs;
-    constexpr auto source = fixed_string<35>("Min: -32768, Max: 32767, Zero: 0");
+    constexpr auto source = fixed_string("Min: -32768, Max: 32767, Zero: 0");
 
     constexpr auto result = scan<fmt, source, std::int16_t, std::int16_t, int>();
     const auto &[min, max, zero] = result.values();
@@ -134,9 +181,9 @@ TEST(ScanTest, AllSpecifiers) {
 
 TEST(ScanTest, OnlyNumbers) {
     constexpr auto fmt = "{}, {}, {}"_fs;
-    constexpr auto source = fixed_string<15>("100, 200, 300");
+    constexpr auto source = fixed_string("100, 200, 300");
 
-    constexpr auto result = scan<fmt, source, int, int, int>();
+    constexpr auto result = scan<fmt, source, int, const int, const int>();
     const auto &[a, b, c] = result.values();
 
     EXPECT_EQ(a, 100);

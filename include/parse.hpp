@@ -11,27 +11,15 @@
 #include "types.hpp"
 
 namespace stdx::details {
+template <typename T>
+concept allowed_type =
+    (std::signed_integral<T> || std::unsigned_integral<T> || std::is_same_v<std::remove_cv_t<T>, std::string_view>) &&
+    !std::is_reference_v<T>;
 
-template <typename T> inline constexpr bool is_allowed_type = false;
-
-template <> inline constexpr bool is_allowed_type<std::int8_t> = true;
-template <> inline constexpr bool is_allowed_type<std::int16_t> = true;
-template <> inline constexpr bool is_allowed_type<std::int32_t> = true;
-template <> inline constexpr bool is_allowed_type<std::int64_t> = true;
-template <> inline constexpr bool is_allowed_type<std::uint8_t> = true;
-template <> inline constexpr bool is_allowed_type<std::uint16_t> = true;
-template <> inline constexpr bool is_allowed_type<std::uint32_t> = true;
-template <> inline constexpr bool is_allowed_type<std::uint64_t> = true;
-template <> inline constexpr bool is_allowed_type<std::string_view> = true;
-
-template <typename T> inline constexpr bool is_allowed_type<const T> = is_allowed_type<T>;
-template <typename T> inline constexpr bool is_allowed_type<volatile T> = is_allowed_type<T>;
-template <typename T> inline constexpr bool is_allowed_type<const volatile T> = is_allowed_type<T>;
-
-template <std::integral T> consteval std::optional<T> parse_value(const char *data, std::size_t size) {
-    T value{};
-    auto [ptr, ec] = std::from_chars(data, data + size, value);
-    if (ec == std::errc{} && ptr > data) {
+template <std::integral T, fixed_string input> consteval std::optional<T> parse_value() {
+    std::remove_cv_t<T> value{};
+    auto [ptr, ec] = std::from_chars(input.data(), input.data() + input.size(), value);
+    if (ec == std::errc{} && ptr > input.data()) {
         return value;
     }
     return std::nullopt;
@@ -88,13 +76,11 @@ template <int I, format_string fmt, fixed_string source> consteval auto get_curr
         return src_sv.size();
     }();
 
-    return std::pair{src_start, src_end};
+    return std::pair{src_start, std::min(src_end, source.size() - 1)};
 }
 
-template <int I, format_string fmt, fixed_string source, typename T> consteval auto parse_input() {
+template <int I, format_string fmt, fixed_string source, allowed_type T> consteval auto parse_input() {
     static_assert(I >= 0 && I < fmt.number_placeholders, "Invalid placeholder index");
-    static_assert(is_allowed_type<T>, "Unsupported type");
-
     constexpr auto bounds = get_current_source_for_parsing<I, fmt, source>();
     constexpr auto start = bounds.first;
     constexpr auto end = bounds.second;
@@ -127,7 +113,8 @@ template <int I, format_string fmt, fixed_string source, typename T> consteval a
     if constexpr (std::same_as<T, std::string_view>) {
         return std::string_view(source.data() + start, data_size);
     } else {
-        constexpr auto parsed_value = parse_value<T>(source.data() + start, data_size);
+        constexpr fixed_string<data_size> value_src(source.data() + start, source.data() + end);
+        constexpr auto parsed_value = parse_value<T, value_src>();
         static_assert(parsed_value.has_value(), "Failed to parse value from source data");
         return parsed_value.value();
     }
