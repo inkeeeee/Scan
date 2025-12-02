@@ -110,7 +110,7 @@ template <int I, format_string fmt, fixed_string source, allowed_type T> constev
         }
     }
 
-    if constexpr (std::same_as<T, std::string_view>) {
+    if constexpr (std::same_as<std::remove_cv_t<T>, std::string_view>) {
         return std::string_view(source.data() + start, data_size);
     } else {
         constexpr fixed_string<data_size> value_src(source.data() + start, source.data() + end);
